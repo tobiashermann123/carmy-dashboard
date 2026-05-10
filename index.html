@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Carmy">
+  <meta name="theme-color" content="#0f172a">
+  <title>Carmy</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f172a;
+      --surface:   #1e293b;
+      --border:    #334155;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --sell:      #ef4444;
+      --buy:       #22c55e;
+      --add:       #4ade80;
+      --trim:      #f97316;
+      --hold:      #64748b;
+      --signal:    #a78bfa;
+      --cash:      #38bdf8;
+      --positive:  #22c55e;
+      --negative:  #ef4444;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 14px; }
+
+    #app { max-width: 480px; margin: 0 auto; padding: 0 0 32px; }
+
+    /* ── Header ── */
+    .header {
+      padding: 52px 16px 16px;
+      background: linear-gradient(180deg, #1e293b 0%, transparent 100%);
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(12px);
+    }
+    .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .header .subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .refresh-btn {
+      position: absolute; top: 52px; right: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; padding: 6px 12px;
+      font-size: 12px; cursor: pointer;
+    }
+    .refresh-btn:active { opacity: 0.7; }
+
+    /* ── Sections ── */
+    .section { padding: 16px 16px 0; }
+    .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 10px; }
+
+    /* ── Scorecards ── */
+    .scorecard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .scorecard { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+    .scorecard .label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .scorecard .value { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .scorecard .value.positive { color: var(--positive); }
+    .scorecard .value.negative { color: var(--negative); }
+
+    /* ── Action chips ── */
+    .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 600;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .chip .count { font-size: 15px; font-weight: 700; }
+    .chip.sell  { background: rgba(239,68,68,0.15);  color: var(--sell); }
+    .chip.buy   { background: rgba(34,197,94,0.15);  color: var(--buy); }
+    .chip.add   { background: rgba(74,222,128,0.12); color: var(--add); }
+    .chip.trim  { background: rgba(249,115,22,0.15); color: var(--trim); }
+    .chip.hold  { background: rgba(100,116,139,0.15);color: var(--hold); }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { background: var(--surface); padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); white-space: nowrap; }
+    tbody tr { border-top: 1px solid var(--border); }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    tbody td { padding: 10px 12px; white-space: nowrap; }
+    .ticker { font-weight: 700; font-size: 13px; }
+    .badge { display: inline-block; border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700; }
+    .badge.SELL   { background: rgba(239,68,68,0.15);  color: var(--sell); }
+    .badge.BUY    { background: rgba(34,197,94,0.15);  color: var(--buy); }
+    .badge.ADD    { background: rgba(74,222,128,0.12); color: var(--add); }
+    .badge.TRIM   { background: rgba(249,115,22,0.15); color: var(--trim); }
+    .badge.HOLD   { background: rgba(100,116,139,0.15);color: var(--hold); }
+    .badge.SIGNAL { background: rgba(167,139,250,0.15);color: var(--signal); }
+    .num { font-variant-numeric: tabular-nums; }
+    .num.pos { color: var(--positive); }
+    .num.neg { color: var(--negative); }
+
+    /* ── Charts ── */
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+    .chart-card .chart-title { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 12px; }
+    .chart-card canvas { max-height: 180px; }
+
+    /* ── Loading / Error ── */
+    .loading { text-align: center; padding: 60px 16px; color: var(--muted); }
+    .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 16px; margin: 16px; color: var(--sell); font-size: 13px; line-height: 1.5; }
+
+    /* ── Spacing ── */
+    .gap { height: 14px; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="loading" id="loading">Loading portfolio data...</div>
+</div>
+
+<script>
+const SHEET_ID = '1yrTE1yxw0h_9yU2h7nbwXzrQq4V2yJg6MlKIeN7SdBk';
+
+// ── CSV fetch + parse ────────────────────────────────────────────────────────
+async function fetchSheet(name) {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Could not load sheet "${name}" (${r.status}). Make sure the spreadsheet is shared as "Anyone with the link — Viewer".`);
+  return parseCSV(await r.text());
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let cur = '', inQ = false, row = [];
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { row.push(cur.trim()); cur = ''; }
+    else if ((c === '\n' || c === '\r') && !inQ) {
+      row.push(cur.trim()); cur = '';
+      if (row.some(v => v)) rows.push(row);
+      row = [];
+      if (c === '\r' && text[i+1] === '\n') i++;
+    } else { cur += c; }
+  }
+  if (cur || row.length) { row.push(cur.trim()); if (row.some(v => v)) rows.push(row); }
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(h => h.replace(/^"|"$/g, ''));
+  return rows.slice(1).map(r => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (r[i] || '').replace(/^"|"$/g, ''); });
+    return obj;
+  });
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+const eur = v => {
+  const n = parseFloat(v);
+  if (isNaN(n)) return '—';
+  return (n < 0 ? '-' : '') + '€' + Math.abs(n).toFixed(2);
+};
+const pct = v => {
+  const n = parseFloat(v);
+  return isNaN(n) ? '—' : (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+};
+const sign = v => parseFloat(v) >= 0 ? 'pos' : 'neg';
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(summary, report, log) {
+  const s = summary[0] || {};
+  const app = document.getElementById('app');
+
+  const invested = parseFloat(s.INVESTED_EUR || 0);
+  const pnl      = parseFloat(s.UNREALIZED_PNL_EUR || 0);
+  const budget   = parseFloat(s.BUDGET_EUR || 100);
+  const cash     = parseFloat(s.CASH_EUR || 0);
+  const updatedRaw = s.LAST_UPDATED || '';
+  const updated  = updatedRaw ? new Date(updatedRaw).toLocaleString('en-IE', { dateStyle:'short', timeStyle:'short' }) : '—';
+
+  const actionable = report.filter(r => !['HOLD',''].includes(r.ACTION));
+  const counts = {};
+  ['SELL','BUY','ADD','TRIM','HOLD'].forEach(a => {
+    counts[a] = report.filter(r => r.ACTION === a).length;
+  });
+
+  app.innerHTML = `
+    <div class="header">
+      <h1>Carmy</h1>
+      <div class="subtitle">Updated ${updated}</div>
+      <button class="refresh-btn" onclick="init()">Refresh</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Portfolio</div>
+      <div class="scorecard-grid">
+        <div class="scorecard">
+          <div class="label">Budget</div>
+          <div class="value">${eur(budget)}</div>
+        </div>
+        <div class="scorecard">
+          <div class="label">Invested</div>
+          <div class="value">${eur(invested)}</div>
+        </div>
+        <div class="scorecard">
+          <div class="label">Cash / MMF</div>
+          <div class="value">${eur(cash)}</div>
+        </div>
+        <div class="scorecard">
+          <div class="label">Unrealised P&L</div>
+          <div class="value ${pnl >= 0 ? 'positive' : 'negative'}">${eur(pnl)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="section">
+      <div class="section-title">Today's Actions</div>
+      <div class="chip-row">
+        ${counts.SELL  ? `<div class="chip sell"><span class="count">${counts.SELL}</span> SELL</div>` : ''}
+        ${counts.BUY   ? `<div class="chip buy"><span class="count">${counts.BUY}</span> BUY</div>` : ''}
+        ${counts.ADD   ? `<div class="chip add"><span class="count">${counts.ADD}</span> ADD</div>` : ''}
+        ${counts.TRIM  ? `<div class="chip trim"><span class="count">${counts.TRIM}</span> TRIM</div>` : ''}
+        ${counts.HOLD  ? `<div class="chip hold"><span class="count">${counts.HOLD}</span> HOLD</div>` : ''}
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="section">
+      <div class="section-title">Rebalancing (${actionable.length} actions)</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Action</th>
+              <th>Target</th>
+              <th>Current</th>
+              <th>Delta</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${actionable.sort((a,b) => parseFloat(a.DELTA_EUR) - parseFloat(b.DELTA_EUR)).map(r => `
+              <tr>
+                <td class="ticker">${r.TICKER}</td>
+                <td><span class="badge ${r.ACTION}">${r.ACTION}</span></td>
+                <td class="num">${eur(r.TARGET_EUR)}</td>
+                <td class="num">${eur(r.CURRENT_EUR)}</td>
+                <td class="num ${sign(r.DELTA_EUR)}">${eur(r.DELTA_EUR)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="section">
+      <div class="chart-card">
+        <div class="chart-title">Unrealised P&L over time</div>
+        <canvas id="pnlChart"></canvas>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="section">
+      <div class="chart-card">
+        <div class="chart-title">Invested vs Cash over time</div>
+        <canvas id="investedChart"></canvas>
+      </div>
+    </div>
+  `;
+
+  // Charts
+  const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 6 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 } } },
+    },
+  };
+
+  const dates    = log.map(r => r.DATE);
+  const pnlVals  = log.map(r => parseFloat(r.UNREALIZED_PNL_EUR) || 0);
+  const invVals  = log.map(r => parseFloat(r.INVESTED_EUR) || 0);
+  const cashVals = log.map(r => parseFloat(r.CASH_EUR) || 0);
+
+  new Chart(document.getElementById('pnlChart'), {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [{
+        data: pnlVals,
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34,197,94,0.08)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: '#22c55e',
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      plugins: {
+        ...chartDefaults.plugins,
+        annotation: {},
+      },
+      scales: {
+        ...chartDefaults.scales,
+        y: {
+          ...chartDefaults.scales.y,
+          ticks: {
+            ...chartDefaults.scales.y.ticks,
+            callback: v => '€' + v.toFixed(0),
+          },
+        },
+      },
+    },
+  });
+
+  new Chart(document.getElementById('investedChart'), {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [
+        {
+          label: 'Invested',
+          data: invVals,
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56,189,248,0.08)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointBackgroundColor: '#38bdf8',
+        },
+        {
+          label: 'Cash',
+          data: cashVals,
+          borderColor: '#94a3b8',
+          backgroundColor: 'rgba(148,163,184,0.06)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointBackgroundColor: '#94a3b8',
+        },
+      ],
+    },
+    options: {
+      ...chartDefaults,
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 10 },
+        },
+      },
+      scales: {
+        ...chartDefaults.scales,
+        y: {
+          ...chartDefaults.scales.y,
+          ticks: {
+            ...chartDefaults.scales.y.ticks,
+            callback: v => '€' + v.toFixed(0),
+          },
+        },
+      },
+    },
+  });
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+async function init() {
+  const app = document.getElementById('app');
+  app.innerHTML = '<div class="loading">Loading...</div>';
+  try {
+    const [summary, report, log] = await Promise.all([
+      fetchSheet('Summary'),
+      fetchSheet('Report'),
+      fetchSheet('Summary Log'),
+    ]);
+    render(summary, report, log);
+  } catch (e) {
+    app.innerHTML = `<div class="error-box"><strong>Could not load data</strong><br><br>${e.message}</div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

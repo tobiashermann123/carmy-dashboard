@@ -1,0 +1,17 @@
+{
+  "name": "Carmy Dashboard",
+  "short_name": "Carmy",
+  "description": "Daily portfolio rebalancing dashboard",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://api.iconify.design/twemoji:chart-increasing.svg?width=192&height=192",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}
