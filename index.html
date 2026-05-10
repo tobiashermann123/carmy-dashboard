@@ -254,21 +254,17 @@ function aggregateLog(log, range) {
     .map(([, { row, dt }]) => ({ ...row, _label: formatLabel(dt, range) }));
 }
 
-function togglePnlView(pnl) {
+function togglePnlView(pnl, budget) {
   pnlView = pnlView === 'eur' ? 'pct' : 'eur';
-  const twr = computeTWR(window._log);
   const el  = document.getElementById('pnlValue');
   const lbl = document.getElementById('pnlLabel');
   if (pnlView === 'pct') {
-    if (twr !== null) {
-      el.textContent = (twr >= 0 ? '+' : '') + twr.toFixed(2) + '%';
-    } else {
-      el.textContent = '—';
-    }
-    lbl.textContent = 'TWR · tap for €';
+    const pct = (budget > 0) ? (pnl / budget * 100) : null;
+    el.textContent  = pct !== null ? (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%' : '—';
+    lbl.textContent = '% of account · tap for €';
   } else {
     el.textContent  = (pnl < 0 ? '-' : '') + '€' + Math.abs(pnl).toFixed(2);
-    lbl.textContent = 'tap for TWR %';
+    lbl.textContent = 'tap for % of account';
   }
 }
 
@@ -397,10 +393,10 @@ function render(summary, report, log, positions) {
 
     <div class="section">
       <div class="scorecard-grid">
-        <div class="scorecard tappable" onclick="togglePnlView(${pnl})">
+        <div class="scorecard tappable" onclick="togglePnlView(${pnl}, ${budget})">
           <div class="label">Unrealised P&amp;L</div>
           <div class="value ${pnl >= 0 ? 'pos' : 'neg'}" id="pnlValue">${eur(pnl)}</div>
-          <div class="tap-label" id="pnlLabel">tap for TWR %</div>
+          <div class="tap-label" id="pnlLabel">tap for % of account</div>
         </div>
         <div class="scorecard">
           <div class="label">Invested</div>
