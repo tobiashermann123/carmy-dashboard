@@ -96,9 +96,11 @@
     .table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--border); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead th { background: var(--surface); padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); white-space: nowrap; }
-    tbody tr { border-top: 1px solid var(--border); }
-    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    tbody tr { border-top: 1px solid var(--border); cursor: pointer; }
+    tbody tr:hover { background: rgba(255,255,255,0.05); }
+    tbody tr:active { background: rgba(255,255,255,0.08); }
     tbody td { padding: 11px 12px; white-space: nowrap; }
+    .tap-hint { font-size: 10px; color: var(--muted); text-align: right; margin-top: 6px; }
     .ticker { font-weight: 700; font-size: 13px; }
     .badge { display: inline-block; border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700; }
     .badge.SELL   { background: rgba(239,68,68,0.15);  color: var(--sell); }
@@ -245,7 +247,11 @@ function render(summary, report, log) {
 
   const actionable = report
     .filter(r => !['HOLD', ''].includes(r.ACTION))
-    .sort((a, b) => parseFloat(a.DELTA_EUR) - parseFloat(b.DELTA_EUR));
+    .sort((a, b) => {
+      if (a.TICKER === 'CASH/MMF') return 1;
+      if (b.TICKER === 'CASH/MMF') return -1;
+      return parseFloat(a.DELTA_EUR) - parseFloat(b.DELTA_EUR);
+    });
 
   app.innerHTML = `
     <div class="header">
@@ -308,17 +314,27 @@ function render(summary, report, log) {
             </tr>
           </thead>
           <tbody>
-            ${actionable.map(r => `
-              <tr>
-                <td class="ticker">${r.TICKER}</td>
+            ${actionable.map(r => {
+              const isCash = r.TICKER === 'CASH/MMF';
+              const yhUrl  = isCash ? '' : `https://finance.yahoo.com/quote/${encodeURIComponent(r.TICKER)}`;
+              const ibkrUrl = isCash ? '' : `https://client.ibkr.com/portal/#/trade?symbol=${encodeURIComponent(r.TICKER)}`;
+              const onclick = isCash ? '' : `onclick="window.open('${yhUrl}','_blank')"`;
+              return `
+              <tr ${onclick}>
+                <td class="ticker">
+                  ${r.TICKER}
+                  ${isCash ? '' : `<span style="font-size:9px;color:var(--muted);margin-left:4px">↗</span>`}
+                </td>
                 <td><span class="badge ${r.ACTION}">${r.ACTION}</span></td>
                 <td class="num">${eur(r.TARGET_EUR)}</td>
                 <td class="num">${eur(r.CURRENT_EUR)}</td>
                 <td class="num ${sign(r.DELTA_EUR)}">${eur(r.DELTA_EUR)}</td>
-              </tr>`).join('')}
+              </tr>`;
+            }).join('')}
           </tbody>
         </table>
       </div>
+      <div class="tap-hint">Tap a row to open on Yahoo Finance</div>
     </div>
   `;
 
