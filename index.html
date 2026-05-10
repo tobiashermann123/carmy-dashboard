@@ -208,6 +208,24 @@ function getBucket(dt, range) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 
+function computeTWR(log) {
+  const sorted = [...log]
+    .filter(r => r.DATE && parseFloat(r.BUDGET_EUR) > 0)
+    .sort((a, b) => a.DATE.localeCompare(b.DATE));
+  if (sorted.length < 2) return null;
+  let twr = 1.0;
+  for (let i = 1; i < sorted.length; i++) {
+    const bmv = parseFloat(sorted[i-1].BUDGET_EUR) || 0;
+    const emv = parseFloat(sorted[i].BUDGET_EUR)   || 0;
+    const cf  = parseFloat(sorted[i].CASH_FLOW_EUR) || 0;
+    if (bmv <= 0) continue;
+    const factor = (emv - cf) / bmv;
+    if (factor <= 0 || !isFinite(factor)) continue;
+    twr *= factor;
+  }
+  return (twr - 1) * 100;
+}
+
 function aggregateLog(log, range) {
   const now    = new Date();
   const cutoff = new Date(now);
@@ -217,7 +235,11 @@ function aggregateLog(log, range) {
   else if (range === '1Y') cutoff.setFullYear(now.getFullYear() - 1);
   else cutoff.setFullYear(2000);
 
-  const filtered = log.filter(r => r.DATE && parseDate(r.DATE) >= cutoff);
+  const filtered = log.filter(r => {
+    if (!r.DATE) return false;
+    if (range === '1D' && r.DATE.length <= 10) return false; // skip legacy date-only rows
+    return parseDate(r.DATE) >= cutoff;
+  });
   if (!filtered.length) return [];
 
   const buckets = {};
@@ -232,18 +254,21 @@ function aggregateLog(log, range) {
     .map(([, { row, dt }]) => ({ ...row, _label: formatLabel(dt, range) }));
 }
 
-function togglePnlView(pnl, invested) {
+function togglePnlView(pnl) {
   pnlView = pnlView === 'eur' ? 'pct' : 'eur';
-  const costBasis = invested - pnl;
-  const pct = costBasis !== 0 ? (pnl / costBasis * 100) : 0;
+  const twr = computeTWR(window._log);
   const el  = document.getElementById('pnlValue');
   const lbl = document.getElementById('pnlLabel');
   if (pnlView === 'pct') {
-    el.textContent  = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
-    lbl.textContent = 'tap for €';
+    if (twr !== null) {
+      el.textContent = (twr >= 0 ? '+' : '') + twr.toFixed(2) + '%';
+    } else {
+      el.textContent = '—';
+    }
+    lbl.textContent = 'TWR · tap for €';
   } else {
     el.textContent  = (pnl < 0 ? '-' : '') + '€' + Math.abs(pnl).toFixed(2);
-    lbl.textContent = 'tap for %';
+    lbl.textContent = 'tap for TWR %';
   }
 }
 
@@ -372,10 +397,10 @@ function render(summary, report, log, positions) {
 
     <div class="section">
       <div class="scorecard-grid">
-        <div class="scorecard tappable" onclick="togglePnlView(${pnl}, ${invested})">
+        <div class="scorecard tappable" onclick="togglePnlView(${pnl})">
           <div class="label">Unrealised P&amp;L</div>
           <div class="value ${pnl >= 0 ? 'pos' : 'neg'}" id="pnlValue">${eur(pnl)}</div>
-          <div class="tap-label" id="pnlLabel">tap for %</div>
+          <div class="tap-label" id="pnlLabel">tap for TWR %</div>
         </div>
         <div class="scorecard">
           <div class="label">Invested</div>
