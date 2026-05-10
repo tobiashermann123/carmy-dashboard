@@ -1,6 +1,6 @@
 {
-  "name": "Carmy Dashboard",
-  "short_name": "Carmy",
+  "name": "Carmen Cooks",
+  "short_name": "Carmen",
   "description": "Daily portfolio rebalancing dashboard",
   "start_url": ".",
   "display": "standalone",

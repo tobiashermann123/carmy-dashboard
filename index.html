@@ -5,84 +5,100 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Carmy">
+  <meta name="apple-mobile-web-app-title" content="Carmen Cooks">
   <meta name="theme-color" content="#0f172a">
-  <title>Carmy</title>
+  <title>Carmen Cooks</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #0f172a;
-      --surface:   #1e293b;
-      --border:    #334155;
-      --text:      #e2e8f0;
-      --muted:     #94a3b8;
-      --sell:      #ef4444;
-      --buy:       #22c55e;
-      --add:       #4ade80;
-      --trim:      #f97316;
-      --hold:      #64748b;
-      --signal:    #a78bfa;
-      --cash:      #38bdf8;
-      --positive:  #22c55e;
-      --negative:  #ef4444;
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --border:   #334155;
+      --text:     #e2e8f0;
+      --muted:    #94a3b8;
+      --sell:     #ef4444;
+      --buy:      #22c55e;
+      --add:      #4ade80;
+      --trim:     #f97316;
+      --hold:     #64748b;
+      --signal:   #a78bfa;
+      --pos:      #22c55e;
+      --neg:      #ef4444;
     }
 
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 14px; }
 
-    #app { max-width: 480px; margin: 0 auto; padding: 0 0 32px; }
+    #app { max-width: 480px; margin: 0 auto; padding: 0 0 40px; }
 
     /* ── Header ── */
     .header {
-      padding: 52px 16px 16px;
+      padding: 52px 16px 14px;
       background: linear-gradient(180deg, #1e293b 0%, transparent 100%);
       position: sticky; top: 0; z-index: 10;
       backdrop-filter: blur(12px);
+      display: flex; align-items: flex-start; justify-content: space-between;
     }
-    .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-    .header .subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .header-left h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+    .header-left .subtitle { color: var(--muted); font-size: 12px; margin-top: 3px; }
     .refresh-btn {
-      position: absolute; top: 52px; right: 16px;
       background: var(--surface); border: 1px solid var(--border);
       color: var(--text); border-radius: 8px; padding: 6px 12px;
-      font-size: 12px; cursor: pointer;
+      font-size: 12px; cursor: pointer; margin-top: 4px; flex-shrink: 0;
     }
     .refresh-btn:active { opacity: 0.7; }
 
     /* ── Sections ── */
-    .section { padding: 16px 16px 0; }
-    .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 10px; }
+    .section { padding: 14px 16px 0; }
+
+    /* ── Chart card ── */
+    .chart-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px;
+    }
+    .chart-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .chart-title { font-size: 13px; font-weight: 700; color: var(--text); }
+
+    /* Toggle pill */
+    .toggle-pill {
+      display: flex; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 20px; padding: 2px; gap: 2px;
+    }
+    .toggle-btn {
+      border: none; border-radius: 16px; padding: 4px 12px;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      background: transparent; color: var(--muted); transition: all 0.15s;
+    }
+    .toggle-btn.active {
+      background: var(--surface); color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+    .chart-card canvas { max-height: 200px; }
 
     /* ── Scorecards ── */
     .scorecard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .scorecard { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
-    .scorecard .label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
-    .scorecard .value { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-    .scorecard .value.positive { color: var(--positive); }
-    .scorecard .value.negative { color: var(--negative); }
-
-    /* ── Action chips ── */
-    .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .chip {
-      border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 600;
-      display: flex; align-items: center; gap: 5px;
+    .scorecard {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px;
     }
-    .chip .count { font-size: 15px; font-weight: 700; }
-    .chip.sell  { background: rgba(239,68,68,0.15);  color: var(--sell); }
-    .chip.buy   { background: rgba(34,197,94,0.15);  color: var(--buy); }
-    .chip.add   { background: rgba(74,222,128,0.12); color: var(--add); }
-    .chip.trim  { background: rgba(249,115,22,0.15); color: var(--trim); }
-    .chip.hold  { background: rgba(100,116,139,0.15);color: var(--hold); }
+    .scorecard .label { font-size: 11px; color: var(--muted); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    .scorecard .value { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .scorecard .value.pos { color: var(--pos); }
+    .scorecard .value.neg { color: var(--neg); }
 
     /* ── Table ── */
-    .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+    .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 10px; }
+    .table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--border); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead th { background: var(--surface); padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); white-space: nowrap; }
     tbody tr { border-top: 1px solid var(--border); }
     tbody tr:hover { background: rgba(255,255,255,0.03); }
-    tbody td { padding: 10px 12px; white-space: nowrap; }
+    tbody td { padding: 11px 12px; white-space: nowrap; }
     .ticker { font-weight: 700; font-size: 13px; }
     .badge { display: inline-block; border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700; }
     .badge.SELL   { background: rgba(239,68,68,0.15);  color: var(--sell); }
@@ -92,25 +108,18 @@
     .badge.HOLD   { background: rgba(100,116,139,0.15);color: var(--hold); }
     .badge.SIGNAL { background: rgba(167,139,250,0.15);color: var(--signal); }
     .num { font-variant-numeric: tabular-nums; }
-    .num.pos { color: var(--positive); }
-    .num.neg { color: var(--negative); }
+    .num.pos { color: var(--pos); }
+    .num.neg { color: var(--neg); }
 
-    /* ── Charts ── */
-    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
-    .chart-card .chart-title { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 12px; }
-    .chart-card canvas { max-height: 180px; }
-
-    /* ── Loading / Error ── */
-    .loading { text-align: center; padding: 60px 16px; color: var(--muted); }
-    .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 16px; margin: 16px; color: var(--sell); font-size: 13px; line-height: 1.5; }
-
-    /* ── Spacing ── */
+    /* ── Utils ── */
     .gap { height: 14px; }
+    .loading { text-align: center; padding: 60px 16px; color: var(--muted); }
+    .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 14px; padding: 16px; margin: 16px; color: var(--sell); font-size: 13px; line-height: 1.5; }
   </style>
 </head>
 <body>
 <div id="app">
-  <div class="loading" id="loading">Loading portfolio data...</div>
+  <div class="loading">Loading portfolio data...</div>
 </div>
 
 <script>
@@ -148,49 +157,125 @@ function parseCSV(text) {
   });
 }
 
-// ── Formatters ────────────────────────────────────────────────────────────────
+// ── Formatters ───────────────────────────────────────────────────────────────
 const eur = v => {
   const n = parseFloat(v);
   if (isNaN(n)) return '—';
   return (n < 0 ? '-' : '') + '€' + Math.abs(n).toFixed(2);
 };
-const pct = v => {
-  const n = parseFloat(v);
-  return isNaN(n) ? '—' : (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
-};
 const sign = v => parseFloat(v) >= 0 ? 'pos' : 'neg';
 
-// ── Render ────────────────────────────────────────────────────────────────────
+// ── Chart state ──────────────────────────────────────────────────────────────
+let activeChart = null;
+let chartMode = 'pnl'; // 'pnl' | 'invested'
+
+function buildChartData(log, mode) {
+  const dates = log.map(r => r.DATE);
+  if (mode === 'pnl') {
+    return {
+      labels: dates,
+      datasets: [{
+        data: log.map(r => parseFloat(r.UNREALIZED_PNL_EUR) || 0),
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34,197,94,0.1)',
+        fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#22c55e',
+      }],
+    };
+  } else {
+    return {
+      labels: dates,
+      datasets: [{
+        label: 'Invested',
+        data: log.map(r => parseFloat(r.INVESTED_EUR) || 0),
+        borderColor: '#38bdf8',
+        backgroundColor: 'rgba(56,189,248,0.1)',
+        fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#38bdf8',
+      }, {
+        label: 'Cash',
+        data: log.map(r => parseFloat(r.CASH_EUR) || 0),
+        borderColor: '#94a3b8',
+        backgroundColor: 'rgba(148,163,184,0.06)',
+        fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#94a3b8',
+      }],
+    };
+  }
+}
+
+const chartOptions = (showLegend) => ({
+  responsive: true,
+  maintainAspectRatio: true,
+  plugins: {
+    legend: showLegend
+      ? { display: true, labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 10 } }
+      : { display: false },
+  },
+  scales: {
+    x: { grid: { color: 'rgba(51,65,85,0.5)' }, ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 6 } },
+    y: { grid: { color: 'rgba(51,65,85,0.5)' }, ticks: { color: '#64748b', font: { size: 10 }, callback: v => '€' + v.toFixed(0) } },
+  },
+});
+
+function switchChart(log, mode) {
+  chartMode = mode;
+  document.querySelectorAll('.toggle-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  if (activeChart) activeChart.destroy();
+  const canvas = document.getElementById('mainChart');
+  activeChart = new Chart(canvas, {
+    type: 'line',
+    data: buildChartData(log, mode),
+    options: chartOptions(mode === 'invested'),
+  });
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
 function render(summary, report, log) {
   const s = summary[0] || {};
   const app = document.getElementById('app');
 
-  const invested = parseFloat(s.INVESTED_EUR || 0);
   const pnl      = parseFloat(s.UNREALIZED_PNL_EUR || 0);
-  const budget   = parseFloat(s.BUDGET_EUR || 100);
-  const cash     = parseFloat(s.CASH_EUR || 0);
+  const invested  = parseFloat(s.INVESTED_EUR || 0);
+  const cash      = parseFloat(s.CASH_EUR || 0);
+  const budget    = parseFloat(s.BUDGET_EUR || 100);
   const updatedRaw = s.LAST_UPDATED || '';
-  const updated  = updatedRaw ? new Date(updatedRaw).toLocaleString('en-IE', { dateStyle:'short', timeStyle:'short' }) : '—';
+  const updated   = updatedRaw
+    ? new Date(updatedRaw).toLocaleString('en-IE', { dateStyle: 'short', timeStyle: 'short' })
+    : '—';
 
-  const actionable = report.filter(r => !['HOLD',''].includes(r.ACTION));
-  const counts = {};
-  ['SELL','BUY','ADD','TRIM','HOLD'].forEach(a => {
-    counts[a] = report.filter(r => r.ACTION === a).length;
-  });
+  const actionable = report
+    .filter(r => !['HOLD', ''].includes(r.ACTION))
+    .sort((a, b) => parseFloat(a.DELTA_EUR) - parseFloat(b.DELTA_EUR));
 
   app.innerHTML = `
     <div class="header">
-      <h1>Carmy</h1>
-      <div class="subtitle">Updated ${updated}</div>
+      <div class="header-left">
+        <h1>Carmen Cooks</h1>
+        <div class="subtitle">Updated ${updated}</div>
+      </div>
       <button class="refresh-btn" onclick="init()">Refresh</button>
     </div>
 
     <div class="section">
-      <div class="section-title">Portfolio</div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title" id="chartTitle">Unrealised P&amp;L over time</div>
+          <div class="toggle-pill">
+            <button class="toggle-btn active" data-mode="pnl" onclick="switchChart(window._log,'pnl')">P&amp;L</button>
+            <button class="toggle-btn" data-mode="invested" onclick="switchChart(window._log,'invested')">Invested</button>
+          </div>
+        </div>
+        <canvas id="mainChart"></canvas>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="section">
       <div class="scorecard-grid">
         <div class="scorecard">
-          <div class="label">Budget</div>
-          <div class="value">${eur(budget)}</div>
+          <div class="label">Unrealised P&amp;L</div>
+          <div class="value ${pnl >= 0 ? 'pos' : 'neg'}">${eur(pnl)}</div>
         </div>
         <div class="scorecard">
           <div class="label">Invested</div>
@@ -201,8 +286,8 @@ function render(summary, report, log) {
           <div class="value">${eur(cash)}</div>
         </div>
         <div class="scorecard">
-          <div class="label">Unrealised P&L</div>
-          <div class="value ${pnl >= 0 ? 'positive' : 'negative'}">${eur(pnl)}</div>
+          <div class="label">Budget</div>
+          <div class="value">${eur(budget)}</div>
         </div>
       </div>
     </div>
@@ -210,20 +295,7 @@ function render(summary, report, log) {
     <div class="gap"></div>
 
     <div class="section">
-      <div class="section-title">Today's Actions</div>
-      <div class="chip-row">
-        ${counts.SELL  ? `<div class="chip sell"><span class="count">${counts.SELL}</span> SELL</div>` : ''}
-        ${counts.BUY   ? `<div class="chip buy"><span class="count">${counts.BUY}</span> BUY</div>` : ''}
-        ${counts.ADD   ? `<div class="chip add"><span class="count">${counts.ADD}</span> ADD</div>` : ''}
-        ${counts.TRIM  ? `<div class="chip trim"><span class="count">${counts.TRIM}</span> TRIM</div>` : ''}
-        ${counts.HOLD  ? `<div class="chip hold"><span class="count">${counts.HOLD}</span> HOLD</div>` : ''}
-      </div>
-    </div>
-
-    <div class="gap"></div>
-
-    <div class="section">
-      <div class="section-title">Rebalancing (${actionable.length} actions)</div>
+      <div class="section-title">Rebalancing · ${actionable.length} actions</div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -236,7 +308,7 @@ function render(summary, report, log) {
             </tr>
           </thead>
           <tbody>
-            ${actionable.sort((a,b) => parseFloat(a.DELTA_EUR) - parseFloat(b.DELTA_EUR)).map(r => `
+            ${actionable.map(r => `
               <tr>
                 <td class="ticker">${r.TICKER}</td>
                 <td><span class="badge ${r.ACTION}">${r.ACTION}</span></td>
@@ -248,126 +320,19 @@ function render(summary, report, log) {
         </table>
       </div>
     </div>
-
-    <div class="gap"></div>
-
-    <div class="section">
-      <div class="chart-card">
-        <div class="chart-title">Unrealised P&L over time</div>
-        <canvas id="pnlChart"></canvas>
-      </div>
-    </div>
-
-    <div class="gap"></div>
-
-    <div class="section">
-      <div class="chart-card">
-        <div class="chart-title">Invested vs Cash over time</div>
-        <canvas id="investedChart"></canvas>
-      </div>
-    </div>
   `;
 
-  // Charts
-  const chartDefaults = {
-    responsive: true,
-    maintainAspectRatio: true,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 6 } },
-      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 } } },
-    },
-  };
+  window._log = log;
+  switchChart(log, chartMode);
 
-  const dates    = log.map(r => r.DATE);
-  const pnlVals  = log.map(r => parseFloat(r.UNREALIZED_PNL_EUR) || 0);
-  const invVals  = log.map(r => parseFloat(r.INVESTED_EUR) || 0);
-  const cashVals = log.map(r => parseFloat(r.CASH_EUR) || 0);
-
-  new Chart(document.getElementById('pnlChart'), {
-    type: 'line',
-    data: {
-      labels: dates,
-      datasets: [{
-        data: pnlVals,
-        borderColor: '#22c55e',
-        backgroundColor: 'rgba(34,197,94,0.08)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3,
-        pointBackgroundColor: '#22c55e',
-      }],
-    },
-    options: {
-      ...chartDefaults,
-      plugins: {
-        ...chartDefaults.plugins,
-        annotation: {},
-      },
-      scales: {
-        ...chartDefaults.scales,
-        y: {
-          ...chartDefaults.scales.y,
-          ticks: {
-            ...chartDefaults.scales.y.ticks,
-            callback: v => '€' + v.toFixed(0),
-          },
-        },
-      },
-    },
-  });
-
-  new Chart(document.getElementById('investedChart'), {
-    type: 'line',
-    data: {
-      labels: dates,
-      datasets: [
-        {
-          label: 'Invested',
-          data: invVals,
-          borderColor: '#38bdf8',
-          backgroundColor: 'rgba(56,189,248,0.08)',
-          fill: true,
-          tension: 0.3,
-          pointRadius: 3,
-          pointBackgroundColor: '#38bdf8',
-        },
-        {
-          label: 'Cash',
-          data: cashVals,
-          borderColor: '#94a3b8',
-          backgroundColor: 'rgba(148,163,184,0.06)',
-          fill: true,
-          tension: 0.3,
-          pointRadius: 3,
-          pointBackgroundColor: '#94a3b8',
-        },
-      ],
-    },
-    options: {
-      ...chartDefaults,
-      plugins: {
-        legend: {
-          display: true,
-          labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 10 },
-        },
-      },
-      scales: {
-        ...chartDefaults.scales,
-        y: {
-          ...chartDefaults.scales.y,
-          ticks: {
-            ...chartDefaults.scales.y.ticks,
-            callback: v => '€' + v.toFixed(0),
-          },
-        },
-      },
-    },
-  });
+  document.getElementById('chartTitle').textContent =
+    chartMode === 'pnl' ? 'Unrealised P&L over time' : 'Invested over time';
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 async function init() {
+  chartMode = 'pnl';
+  if (activeChart) { activeChart.destroy(); activeChart = null; }
   const app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Loading...</div>';
   try {
