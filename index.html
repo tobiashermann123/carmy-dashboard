@@ -232,7 +232,7 @@ function switchChart(log, mode) {
 }
 
 // ── Render ───────────────────────────────────────────────────────────────────
-function render(summary, report, log) {
+function render(summary, report, log, positions) {
   const s = summary[0] || {};
   const app = document.getElementById('app');
 
@@ -337,6 +337,41 @@ function render(summary, report, log) {
       </div>
       <div class="tap-hint">Tap ticker → Yahoo Finance &nbsp;·&nbsp; Tap delta → Trade on IBKR</div>
     </div>
+
+    <div class="gap"></div>
+
+    <div class="section">
+      <div class="section-title">My Positions · ${positions.length} stocks</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Value (€)</th>
+              <th>P&amp;L (€)</th>
+              <th>P&amp;L %</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${[...positions]
+              .sort((a, b) => parseFloat(b['PNL PCT'] || 0) - parseFloat(a['PNL PCT'] || 0))
+              .map(p => {
+                const pnlPct = parseFloat(p['PNL PCT'] || 0);
+                const yhUrl  = `https://finance.yahoo.com/quote/${encodeURIComponent(p.TICKER)}`;
+                const pnlSign = pnlPct >= 0 ? 'pos' : 'neg';
+                const pnlPctFmt = isNaN(pnlPct) ? '—' : (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%';
+                return `
+                <tr onclick="window.open('${yhUrl}','_blank')" style="cursor:pointer">
+                  <td class="ticker">${p.TICKER} <span style="font-size:9px;color:var(--muted)">↗</span></td>
+                  <td class="num">${eur(p['MARKET VALUE EUR'])}</td>
+                  <td class="num ${sign(p['UNREALIZED P&L EUR'])}">${eur(p['UNREALIZED P&L EUR'])}</td>
+                  <td class="num ${pnlSign}" style="font-weight:700">${pnlPctFmt}</td>
+                </tr>`;
+              }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
   `;
 
   window._log = log;
@@ -353,12 +388,13 @@ async function init() {
   const app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Loading...</div>';
   try {
-    const [summary, report, log] = await Promise.all([
+    const [summary, report, log, positions] = await Promise.all([
       fetchSheet('Summary'),
       fetchSheet('Report'),
       fetchSheet('Summary Log'),
+      fetchSheet('My Portfolio'),
     ]);
-    render(summary, report, log);
+    render(summary, report, log, positions);
   } catch (e) {
     app.innerHTML = `<div class="error-box"><strong>Could not load data</strong><br><br>${e.message}</div>`;
   }
