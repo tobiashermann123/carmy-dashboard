@@ -135,6 +135,12 @@
     tbody tr:hover { background: rgba(255,255,255,0.05); }
     tbody tr:active { background: rgba(255,255,255,0.08); }
     tbody td { padding: 11px 12px; white-space: nowrap; }
+    tr.collapsed-row { display: none; }
+    tr.show-more-row td {
+      text-align: center; color: var(--muted); font-size: 12px; font-weight: 600;
+      padding: 10px; cursor: pointer; border-top: 1px solid var(--border);
+    }
+    tr.show-more-row:hover td { color: var(--text); background: rgba(255,255,255,0.04); }
     .tap-hint { font-size: 10px; color: var(--muted); text-align: right; margin-top: 6px; }
     .ticker { font-weight: 700; font-size: 13px; }
     .badge { display: inline-block; border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700; }
@@ -482,7 +488,8 @@ function sortTable(thEl) {
   const headers = Array.from(thEl.parentElement.children);
   const colIdx  = headers.indexOf(thEl);
   const tbody   = table.querySelector('tbody');
-  const rows    = Array.from(tbody.querySelectorAll('tr'));
+  const showMoreRow = tbody.querySelector('.show-more-row');
+  const rows    = Array.from(tbody.querySelectorAll('tr:not(.show-more-row)'));
 
   const asc = thEl.dataset.sort !== 'asc';
 
@@ -503,7 +510,46 @@ function sortTable(thEl) {
     return asc ? aText.localeCompare(bText) : bText.localeCompare(aText);
   });
 
-  rows.forEach(r => tbody.appendChild(r));
+  rows.forEach(r => {
+    r.classList.remove('collapsed-row');
+    tbody.insertBefore(r, showMoreRow || null);
+  });
+
+  if (table.dataset.collapsed === 'true') {
+    const maxRows = parseInt(table.dataset.maxRows || 10);
+    rows.forEach((r, i) => { if (i >= maxRows) r.classList.add('collapsed-row'); });
+    if (showMoreRow) {
+      const hidden = rows.filter(r => r.classList.contains('collapsed-row')).length;
+      showMoreRow.querySelector('td').textContent = `Show ${hidden} more ▾`;
+    }
+  }
+}
+
+// ── Collapsible tables (10 rows default) ────────────────────────────────────
+function initCollapsibleTables(maxRows = 10, container = document) {
+  container.querySelectorAll('table').forEach(table => {
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr:not(.show-more-row)'));
+    if (rows.length <= maxRows) return;
+
+    table.dataset.collapsed = 'true';
+    table.dataset.maxRows   = maxRows;
+
+    rows.forEach((r, i) => { if (i >= maxRows) r.classList.add('collapsed-row'); });
+
+    const colCount = table.querySelector('thead tr')?.children.length || 1;
+    const extra    = rows.length - maxRows;
+    const smRow    = document.createElement('tr');
+    smRow.className = 'show-more-row';
+    smRow.innerHTML = `<td colspan="${colCount}">Show ${extra} more ▾</td>`;
+    smRow.onclick = () => {
+      table.dataset.collapsed = 'false';
+      tbody.querySelectorAll('tr.collapsed-row').forEach(r => r.classList.remove('collapsed-row'));
+      smRow.remove();
+    };
+    tbody.appendChild(smRow);
+  });
 }
 
 // ── Earnings filter + table ──────────────────────────────────────────────────
@@ -511,7 +557,10 @@ function setEarningsFilter(f) {
   window._earningsFilter = f;
   const earningsData = window._earningsData || [];
   const container = document.getElementById('earningsTableContainer');
-  if (container) container.innerHTML = buildEarningsTable(earningsData);
+  if (container) {
+    container.innerHTML = buildEarningsTable(earningsData);
+    initCollapsibleTables(10, container);
+  }
   document.querySelectorAll('.filter-tab').forEach(b => {
     b.classList.toggle('active', b.dataset.filter === f);
   });
@@ -907,6 +956,8 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
 
   document.getElementById('chartTitle').textContent =
     chartMode === 'pnl' ? 'Unrealised P&L over time' : 'Invested over time';
+
+  initCollapsibleTables();
 }
 
 // ── Brian changes bottom sheet ────────────────────────────────────────────────
