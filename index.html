@@ -830,7 +830,6 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
             ${actionable.map(r => {
               const isCash  = r.TICKER === 'CASH/MMF';
               const yhUrl   = isCash ? '' : `https://finance.yahoo.com/quote/${encodeURIComponent(r.TICKER)}`;
-              const ibkrUrl = isCash ? '' : `https://client.ibkr.com/portal/#/trade?symbol=${encodeURIComponent(r.TICKER)}`;
               return `
               <tr>
                 <td class="ticker" ${isCash ? '' : `onclick="window.open('${yhUrl}','_blank')"`} style="${isCash ? '' : 'cursor:pointer'}">
@@ -840,15 +839,13 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
                 <td><span class="badge ${r.ACTION}">${r.ACTION}</span></td>
                 <td class="num">${eur(r.TARGET_EUR)}</td>
                 <td class="num">${eur(r.CURRENT_EUR)}</td>
-                <td class="num ${sign(r.DELTA_EUR)}" ${isCash ? '' : `onclick="window.open('${ibkrUrl}','_blank')"`} style="${isCash ? '' : 'cursor:pointer;text-decoration:underline;text-decoration-color:rgba(148,163,184,0.4)'}">
-                  ${eur(r.DELTA_EUR)}
-                </td>
+                <td class="num ${sign(r.DELTA_EUR)}">${eur(r.DELTA_EUR)}</td>
               </tr>`;
             }).join('')}
           </tbody>
         </table>
       </div>
-      <div class="tap-hint">Tap ticker → Yahoo Finance &nbsp;·&nbsp; Tap delta → Trade on IBKR</div>
+      <div class="tap-hint">Tap ticker → Yahoo Finance</div>
     </div>
 
     <div class="gap"></div>
