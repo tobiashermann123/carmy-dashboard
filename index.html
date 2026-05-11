@@ -147,6 +147,20 @@
     .loading { text-align: center; padding: 60px 16px; color: var(--muted); }
     .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 14px; padding: 16px; margin: 16px; color: var(--sell); font-size: 13px; line-height: 1.5; }
 
+    /* ── Scorecard ── */
+    .score-stats {
+      display: flex; gap: 10px; margin-bottom: 12px;
+    }
+    .score-stat {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 10px; text-align: center;
+    }
+    .score-stat .s-val { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .score-stat .s-lbl { font-size: 10px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .badge.CORRECT   { background: rgba(34,197,94,0.15);  color: var(--buy); }
+    .badge.INCORRECT { background: rgba(239,68,68,0.15);  color: var(--sell); }
+    .badge.NEUTRAL   { background: rgba(100,116,139,0.15);color: var(--hold); }
+
     /* ── Brian changes bottom sheet ── */
     .brian-alert  { display: flex; align-items: center; justify-content: space-between; }
     .brian-info   { display: flex; align-items: center; justify-content: space-between; }
@@ -414,7 +428,7 @@ function rebuildChart() {
 }
 
 // ── Render ───────────────────────────────────────────────────────────────────
-function render(summary, report, log, positions, brianPortfolio) {
+function render(summary, report, log, positions, brianPortfolio, scoreSummary, scoreRows) {
   const s = summary[0] || {};
   const app = document.getElementById('app');
 
@@ -501,6 +515,59 @@ function render(summary, report, log, positions, brianPortfolio) {
         </div>
       </div>
     </div>
+
+    <div class="gap"></div>
+
+    ${(() => {
+      const ssMap = Object.fromEntries((scoreSummary || []).map(r => [r.METRIC, r]));
+      const buyHit  = ssMap['BUY hit rate (1M)']?.VALUE  || '—';
+      const avgRet  = ssMap['Avg return per BUY signal (1M)']?.VALUE || '—';
+      const total   = ssMap['Total signals scored']?.VALUE || '0';
+      const last20  = (scoreRows || []).slice(-20).reverse();
+
+      const outcomeClass = o => ['CORRECT','INCORRECT','NEUTRAL'].includes(o) ? o : '';
+
+      return `
+    <div class="section">
+      <div class="section-title">Signal Scorecard · ${total} signals scored</div>
+      <div class="score-stats">
+        <div class="score-stat">
+          <div class="s-val ${buyHit !== '—' && parseFloat(buyHit) >= 50 ? 'pos' : buyHit !== '—' ? 'neg' : ''}">${buyHit}</div>
+          <div class="s-lbl">BUY hit rate (1M)</div>
+        </div>
+        <div class="score-stat">
+          <div class="s-val ${avgRet !== '—' && parseFloat(avgRet) >= 0 ? 'pos' : avgRet !== '—' ? 'neg' : ''}">${avgRet}</div>
+          <div class="s-lbl">Avg BUY return (1M)</div>
+        </div>
+        <div class="score-stat">
+          <div class="s-val">${total}</div>
+          <div class="s-lbl">Signals scored</div>
+        </div>
+      </div>
+      ${last20.length === 0 ? `<div style="color:var(--muted);font-size:12px;padding:8px 0">No scored signals yet — check back tomorrow.</div>` : `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Ticker</th><th>Action</th><th>1M Return</th><th>Outcome</th></tr></thead>
+          <tbody>
+            ${last20.map(r => {
+              const ret = r['+1M_RETURN_PCT'];
+              const out = r['+1M_OUTCOME'] || '';
+              const retFmt = ret ? (parseFloat(ret) >= 0 ? '+' : '') + parseFloat(ret).toFixed(2) + '%' : '—';
+              const retClass = ret ? (parseFloat(ret) >= 0 ? 'pos' : 'neg') : '';
+              const dateShort = (r.SIGNAL_DATE || '').slice(0, 10);
+              return `<tr>
+                <td style="color:var(--muted);font-size:12px">${dateShort}</td>
+                <td class="ticker">${r.TICKER || '—'}</td>
+                <td><span class="badge ${r.ACTION || ''}">${r.ACTION || '—'}</span></td>
+                <td class="num ${retClass}">${retFmt}</td>
+                <td>${out ? `<span class="badge ${outcomeClass(out)}">${out}</span>` : '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`}
+    </div>`;
+    })()}
 
     <div class="gap"></div>
 
@@ -637,17 +704,19 @@ async function init() {
   const app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Loading...</div>';
   try {
-    const [summary, report, log, positions, brianPortfolio, brianChanges] = await Promise.all([
+    const [summary, report, log, positions, brianPortfolio, brianChanges, scoreSummary, scoreRows] = await Promise.all([
       fetchSheet('Summary'),
       fetchSheet('Report'),
       fetchSheet('Summary Log'),
       fetchSheet('My Portfolio'),
       fetchSheet("Brian's Portfolio"),
       fetchSheet('Change'),
+      fetchSheet('Scorecard Summary'),
+      fetchSheet('Scorecard'),
     ]);
     window._brianChanges  = brianChanges;
     window._brianSnapshot = (brianPortfolio && brianPortfolio[0]) ? (brianPortfolio[0]['SNAPSHOT TIME'] || '') : '';
-    render(summary, report, log, positions, brianPortfolio);
+    render(summary, report, log, positions, brianPortfolio, scoreSummary, scoreRows);
   } catch (e) {
     app.innerHTML = `<div class="error-box"><strong>Could not load data</strong><br><br>${e.message}</div>`;
   }
