@@ -167,6 +167,43 @@
     .trend-FADING  { color: var(--hold); opacity: 0.6; }
     .pipeline-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
 
+    /* ── Risk Alert Bar ── */
+    .risk-bar {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 8px 16px; margin-bottom: 4px;
+    }
+    .risk-chip {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; cursor: pointer;
+      white-space: nowrap;
+    }
+    .risk-chip.breach   { background: rgba(239,68,68,0.2);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); }
+    .risk-chip.critical { background: rgba(249,115,22,0.2); color: #fdba74; border: 1px solid rgba(249,115,22,0.4); }
+    .risk-chip.warning  { background: rgba(234,179,8,0.15); color: #fde047; border: 1px solid rgba(234,179,8,0.3); }
+
+    /* ── Stop Loss table tier colors ── */
+    tr.tier-BREACH   { background: rgba(239,68,68,0.08) !important; }
+    tr.tier-CRITICAL { background: rgba(249,115,22,0.08) !important; }
+    tr.tier-WARNING  { background: rgba(234,179,8,0.06) !important; }
+    tr.tier-WATCH    { background: rgba(234,179,8,0.03) !important; }
+
+    /* ── Earnings tier colors ── */
+    .earn-CRITICAL { color: var(--sell); font-weight: 700; }
+    .earn-WARNING  { color: var(--trim); font-weight: 600; }
+    .earn-WATCH    { color: #fde047; }
+    .earn-CLEAR    { color: var(--buy); }
+    .earn-UNKNOWN  { color: var(--muted); }
+
+    /* ── Earnings filter tabs ── */
+    .filter-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .filter-tab {
+      border: 1px solid var(--border); border-radius: 8px;
+      background: transparent; color: var(--muted);
+      font-size: 11px; font-weight: 600; padding: 4px 10px; cursor: pointer;
+    }
+    .filter-tab.active { background: var(--border); color: var(--text); }
+
     /* ── Brian changes bottom sheet ── */
     .brian-alert  { display: flex; align-items: center; justify-content: space-between; }
     .brian-info   { display: flex; align-items: center; justify-content: space-between; }
@@ -434,7 +471,51 @@ function rebuildChart() {
 }
 
 // ── Render ───────────────────────────────────────────────────────────────────
-function render(summary, report, log, positions, brianPortfolio, scoreSummary, scoreRows, pipeline) {
+function setEarningsFilter(f) {
+  window._earningsFilter = f;
+  const earningsData = window._earningsData || [];
+  const container = document.getElementById('earningsTableContainer');
+  if (container) container.innerHTML = buildEarningsTable(earningsData);
+  document.querySelectorAll('.filter-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === f);
+  });
+}
+
+function buildEarningsTable(earningsData) {
+  const f = window._earningsFilter || 'portfolio';
+  let filtered = earningsData;
+  if (f === 'portfolio')       filtered = earningsData.filter(r => r.IN_YOUR_PORTFOLIO === 'YES');
+  else if (f === 'recs')       filtered = earningsData.filter(r => r.IS_RECOMMENDATION === 'YES');
+  else if (f === 'pipeline')   filtered = earningsData.filter(r => r.IS_PIPELINE === 'YES');
+
+  if (filtered.length === 0) {
+    return `<div style="color:var(--muted);font-size:12px;padding:8px 0">No earnings data for this filter.</div>`;
+  }
+  return `
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Reports</th><th>Days</th><th>Beat Rate</th><th>Avg Surprise</th><th>Tier</th></tr></thead>
+      <tbody>
+        ${filtered.map(r => {
+          const tier = r.TIER || 'UNKNOWN';
+          const daysVal = r.DAYS_AWAY !== '' ? r.DAYS_AWAY : '—';
+          const yhUrl = `https://finance.yahoo.com/quote/${encodeURIComponent(r.TICKER)}`;
+          const avgSurp = r.AVG_SURPRISE_PCT !== '' ? (parseFloat(r.AVG_SURPRISE_PCT) >= 0 ? '+' : '') + parseFloat(r.AVG_SURPRISE_PCT).toFixed(1) + '%' : '—';
+          return `<tr onclick="window.open('${yhUrl}','_blank')" style="cursor:pointer">
+            <td class="ticker">${r.TICKER} <span style="font-size:9px;color:var(--muted)">↗</span></td>
+            <td style="font-size:12px;color:var(--muted)">${r.NEXT_EARNINGS || '—'}</td>
+            <td class="num">${daysVal}</td>
+            <td style="font-size:12px">${r.BEAT_RATE || '—'}</td>
+            <td class="num">${avgSurp}</td>
+            <td><span class="earn-${tier}">${tier}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function render(summary, report, log, positions, brianPortfolio, scoreSummary, scoreRows, pipeline, stopLosses, earningsData) {
   const s = summary[0] || {};
   const app = document.getElementById('app');
 
@@ -525,6 +606,21 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
     <div class="gap"></div>
 
     ${(() => {
+      const breaches = (stopLosses || []).filter(r => r.TIER === 'BREACH');
+      const criticals = (stopLosses || []).filter(r => r.TIER === 'CRITICAL');
+      const earnCritical = (earningsData || []).filter(r => r.TIER === 'CRITICAL' && r.IN_YOUR_PORTFOLIO === 'YES');
+      const allChips = [
+        ...breaches.map(r => ({label: `${r.TICKER} stop breached (${parseFloat(r.DISTANCE_PCT||0).toFixed(1)}%)`, cls: 'breach'})),
+        ...criticals.map(r => ({label: `${r.TICKER} stop ${parseFloat(r.DISTANCE_PCT||0).toFixed(1)}% away`, cls: 'critical'})),
+        ...earnCritical.map(r => ({label: `${r.TICKER} earnings in ${r.DAYS_AWAY}d`, cls: 'critical'})),
+      ];
+      return allChips.length === 0 ? '' : `
+<div class="risk-bar">${allChips.map(c => `<div class="risk-chip ${c.cls}">${c.label}</div>`).join('')}</div>`;
+    })()}
+
+    <div class="gap"></div>
+
+    ${(() => {
       const ssMap = Object.fromEntries((scoreSummary || []).map(r => [r.METRIC, r]));
       const buyHit  = ssMap['BUY hit rate (1M)']?.VALUE  || '—';
       const avgRet  = ssMap['Avg return per BUY signal (1M)']?.VALUE || '—';
@@ -605,6 +701,67 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
 
     <div class="gap"></div>
 
+    ${(() => {
+      const sl = (stopLosses || []).sort((a, b) => parseFloat(a.DISTANCE_PCT||0) - parseFloat(b.DISTANCE_PCT||0));
+      if (sl.length === 0) return '';
+      const warningCount = sl.filter(r => ['BREACH','CRITICAL','WARNING'].includes(r.TIER)).length;
+      const totalRisk = sl.reduce((s, r) => {
+        const v = parseFloat(r.MAX_RISK_EUR||0);
+        return s + (v > 0 ? v : 0);
+      }, 0);
+      return `
+    <div class="section">
+      <div class="section-title">Stop Loss Monitor · ${sl.length} positions</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
+        Total risk: €${totalRisk.toFixed(0)} · ${warningCount} position${warningCount !== 1 ? 's' : ''} in warning zone
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Ticker</th><th>Current</th><th>Stop</th><th>Distance</th><th>Max Risk</th><th>Type</th><th>Status</th></tr></thead>
+          <tbody>
+            ${sl.map(r => {
+              const tier = r.TIER || '';
+              const dist = parseFloat(r.DISTANCE_PCT || 0);
+              const distFmt = (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%';
+              const distClass = dist <= 0 ? 'neg' : dist <= 7 ? '' : 'pos';
+              const yhUrl = `https://finance.yahoo.com/quote/${encodeURIComponent(r.TICKER)}`;
+              return `<tr class="tier-${tier}" onclick="window.open('${yhUrl}','_blank')" style="cursor:pointer">
+                <td class="ticker">${r.TICKER} <span style="font-size:9px;color:var(--muted)">↗</span></td>
+                <td class="num">$${parseFloat(r.CURRENT_PRICE||0).toFixed(2)}</td>
+                <td class="num">$${parseFloat(r.STOP_PRICE||0).toFixed(2)}</td>
+                <td class="num ${distClass}">${distFmt}</td>
+                <td class="num">€${parseFloat(r.MAX_RISK_EUR||0).toFixed(0)}</td>
+                <td style="font-size:11px;color:var(--muted)">${r.STOP_TYPE||'—'}</td>
+                <td><span class="earn-${tier}">${tier}</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+    })()}
+
+    <div class="gap"></div>
+
+    ${(() => {
+      window._earningsData = earningsData || [];
+      window._earningsFilter = window._earningsFilter || 'portfolio';
+      const ed = earningsData || [];
+      if (ed.length === 0) return '';
+      return `
+    <div class="section">
+      <div class="section-title">Earnings Calendar · ${ed.length} tickers tracked</div>
+      <div class="filter-tabs">
+        <button class="filter-tab ${window._earningsFilter === 'portfolio' ? 'active' : ''}" data-filter="portfolio" onclick="setEarningsFilter('portfolio')">Your Portfolio</button>
+        <button class="filter-tab ${window._earningsFilter === 'recs' ? 'active' : ''}" data-filter="recs" onclick="setEarningsFilter('recs')">Recommendations</button>
+        <button class="filter-tab ${window._earningsFilter === 'pipeline' ? 'active' : ''}" data-filter="pipeline" onclick="setEarningsFilter('pipeline')">Pipeline</button>
+      </div>
+      <div id="earningsTableContainer">${buildEarningsTable(ed)}</div>
+    </div>`;
+    })()}
+
+    <div class="gap"></div>
+
     <div class="section">
       <div class="section-title">Rebalancing · ${actionable.length} actions</div>
       <div class="table-wrap">
@@ -680,6 +837,7 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
   `;
 
   window._log = log;
+  window._earningsData = earningsData || [];
   rebuildChart();
 
   document.getElementById('chartTitle').textContent =
@@ -738,7 +896,7 @@ async function init() {
   const app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Loading...</div>';
   try {
-    const [summary, report, log, positions, brianPortfolio, brianChanges, scoreSummary, scoreRows, pipeline] = await Promise.all([
+    const [summary, report, log, positions, brianPortfolio, brianChanges, scoreSummary, scoreRows, pipeline, stopLosses, earningsCalendar] = await Promise.all([
       fetchSheet('Summary'),
       fetchSheet('Report'),
       fetchSheet('Summary Log'),
@@ -748,10 +906,12 @@ async function init() {
       fetchSheet('Scorecard Summary'),
       fetchSheet('Scorecard'),
       fetchSheet('Pipeline'),
+      fetchSheet('Stop Losses').catch(() => []),
+      fetchSheet('Earnings Calendar').catch(() => []),
     ]);
     window._brianChanges  = brianChanges;
     window._brianSnapshot = (brianPortfolio && brianPortfolio[0]) ? (brianPortfolio[0]['SNAPSHOT TIME'] || '') : '';
-    render(summary, report, log, positions, brianPortfolio, scoreSummary, scoreRows, pipeline);
+    render(summary, report, log, positions, brianPortfolio, scoreSummary, scoreRows, pipeline, stopLosses, earningsCalendar);
   } catch (e) {
     app.innerHTML = `<div class="error-box"><strong>Could not load data</strong><br><br>${e.message}</div>`;
   }
