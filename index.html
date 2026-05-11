@@ -50,6 +50,24 @@
     }
     .refresh-btn:active { opacity: 0.7; }
 
+    /* ── Brian banners ── */
+    .brian-alert {
+      margin: 0 16px 4px;
+      padding: 10px 14px;
+      background: #fff3cd;
+      color: #7d5a00;
+      border-left: 4px solid #f5a623;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .brian-info {
+      margin: 0 16px 4px;
+      padding: 6px 14px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
     /* ── Sections ── */
     .section { padding: 14px 16px 0; }
 
@@ -339,7 +357,7 @@ function rebuildChart() {
 }
 
 // ── Render ───────────────────────────────────────────────────────────────────
-function render(summary, report, log, positions) {
+function render(summary, report, log, positions, brianPortfolio) {
   const s = summary[0] || {};
   const app = document.getElementById('app');
 
@@ -351,6 +369,17 @@ function render(summary, report, log, positions) {
   const updated   = updatedRaw
     ? new Date(updatedRaw).toLocaleString('en-IE', { dateStyle: 'short', timeStyle: 'short' })
     : '—';
+
+  const brianSnapshotRaw = (brianPortfolio && brianPortfolio[0]) ? (brianPortfolio[0]['SNAPSHOT TIME'] || '') : '';
+  const brianSnapshotDate = brianSnapshotRaw ? new Date(brianSnapshotRaw) : null;
+  const brianHoursAgo = brianSnapshotDate ? Math.round((Date.now() - brianSnapshotDate) / 3600000) : null;
+  const brianUpdatedStr = brianSnapshotDate
+    ? brianSnapshotDate.toLocaleString('en-IE', { dateStyle: 'short', timeStyle: 'short' })
+    : 'unknown';
+  const brianIsRecent = brianHoursAgo !== null && brianHoursAgo < 24;
+  const brianBanner = brianIsRecent
+    ? `<div class="brian-alert">⚡ Brian updated his portfolio ${brianHoursAgo < 1 ? 'less than an hour' : brianHoursAgo + 'h'} ago — review your rebalancing</div>`
+    : `<div class="brian-info">Brian's portfolio last updated: ${brianUpdatedStr}</div>`;
 
   const actionable = report
     .filter(r => !['HOLD', ''].includes(r.ACTION))
@@ -368,6 +397,8 @@ function render(summary, report, log, positions) {
       </div>
       <button class="refresh-btn" onclick="init()">Refresh</button>
     </div>
+
+    ${brianBanner}
 
     <div class="section">
       <div class="chart-card">
@@ -505,13 +536,14 @@ async function init() {
   const app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Loading...</div>';
   try {
-    const [summary, report, log, positions] = await Promise.all([
+    const [summary, report, log, positions, brianPortfolio] = await Promise.all([
       fetchSheet('Summary'),
       fetchSheet('Report'),
       fetchSheet('Summary Log'),
       fetchSheet('My Portfolio'),
+      fetchSheet("Brian's Portfolio"),
     ]);
-    render(summary, report, log, positions);
+    render(summary, report, log, positions, brianPortfolio);
   } catch (e) {
     app.innerHTML = `<div class="error-box"><strong>Could not load data</strong><br><br>${e.message}</div>`;
   }
