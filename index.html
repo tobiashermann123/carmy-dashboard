@@ -444,7 +444,7 @@ function render(summary, report, log, positions, brianPortfolio) {
     .sort((a, b) => {
       if (a.TICKER === 'CASH/MMF') return 1;
       if (b.TICKER === 'CASH/MMF') return -1;
-      return parseFloat(a.DELTA_EUR) - parseFloat(b.DELTA_EUR);
+      return parseFloat(b.DELTA_EUR) - parseFloat(a.DELTA_EUR);
     });
 
   app.innerHTML = `
