@@ -124,7 +124,13 @@
     .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 10px; }
     .table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--border); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    thead th { background: var(--surface); padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); white-space: nowrap; }
+    thead th {
+      background: var(--surface); padding: 10px 12px; text-align: left;
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--muted); white-space: nowrap;
+      cursor: pointer; user-select: none;
+    }
+    thead th:hover { color: var(--text); }
     tbody tr { border-top: 1px solid var(--border); cursor: pointer; }
     tbody tr:hover { background: rgba(255,255,255,0.05); }
     tbody tr:active { background: rgba(255,255,255,0.08); }
@@ -470,7 +476,37 @@ function rebuildChart() {
   });
 }
 
-// ── Render ───────────────────────────────────────────────────────────────────
+// ── Sortable table headers ───────────────────────────────────────────────────
+function sortTable(thEl) {
+  const table   = thEl.closest('table');
+  const headers = Array.from(thEl.parentElement.children);
+  const colIdx  = headers.indexOf(thEl);
+  const tbody   = table.querySelector('tbody');
+  const rows    = Array.from(tbody.querySelectorAll('tr'));
+
+  const asc = thEl.dataset.sort !== 'asc';
+
+  headers.forEach(h => {
+    h.dataset.orig = h.dataset.orig || h.textContent;
+    h.dataset.sort = '';
+    h.textContent  = h.dataset.orig;
+  });
+  thEl.dataset.sort = asc ? 'asc' : 'desc';
+  thEl.textContent  = (thEl.dataset.orig || thEl.textContent) + (asc ? ' ▲' : ' ▼');
+
+  rows.sort((a, b) => {
+    const aText = (a.cells[colIdx]?.textContent || '').trim();
+    const bText = (b.cells[colIdx]?.textContent || '').trim();
+    const aNum  = parseFloat(aText.replace(/[€%$+, ]/g, ''));
+    const bNum  = parseFloat(bText.replace(/[€%$+, ]/g, ''));
+    if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
+    return asc ? aText.localeCompare(bText) : bText.localeCompare(aText);
+  });
+
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// ── Earnings filter + table ──────────────────────────────────────────────────
 function setEarningsFilter(f) {
   window._earningsFilter = f;
   const earningsData = window._earningsData || [];
@@ -494,7 +530,14 @@ function buildEarningsTable(earningsData) {
   return `
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Ticker</th><th>Reports</th><th>Days</th><th>Beat Rate</th><th>Avg Surprise</th><th>Tier</th></tr></thead>
+      <thead><tr>
+        <th onclick="sortTable(this)">Ticker</th>
+        <th onclick="sortTable(this)">Reports</th>
+        <th onclick="sortTable(this)">Days</th>
+        <th onclick="sortTable(this)">Beat Rate</th>
+        <th onclick="sortTable(this)">Avg Surprise</th>
+        <th onclick="sortTable(this)">Tier</th>
+      </tr></thead>
       <tbody>
         ${filtered.map(r => {
           const tier = r.TIER || 'UNKNOWN';
@@ -515,6 +558,7 @@ function buildEarningsTable(earningsData) {
   </div>`;
 }
 
+// ── Render ───────────────────────────────────────────────────────────────────
 function render(summary, report, log, positions, brianPortfolio, scoreSummary, scoreRows, pipeline, stopLosses, earningsData) {
   const s = summary[0] || {};
   const app = document.getElementById('app');
@@ -621,59 +665,6 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
     <div class="gap"></div>
 
     ${(() => {
-      const ssMap = Object.fromEntries((scoreSummary || []).map(r => [r.METRIC, r]));
-      const buyHit  = ssMap['BUY hit rate (1M)']?.VALUE  || '—';
-      const avgRet  = ssMap['Avg return per BUY signal (1M)']?.VALUE || '—';
-      const total   = ssMap['Total signals scored']?.VALUE || '0';
-      const last20  = (scoreRows || []).slice(-20).reverse();
-
-      const outcomeClass = o => ['CORRECT','INCORRECT','NEUTRAL'].includes(o) ? o : '';
-
-      return `
-    <div class="section">
-      <div class="section-title">Signal Scorecard · ${total} signals scored</div>
-      <div class="score-stats">
-        <div class="score-stat">
-          <div class="s-val ${buyHit !== '—' && parseFloat(buyHit) >= 50 ? 'pos' : buyHit !== '—' ? 'neg' : ''}">${buyHit}</div>
-          <div class="s-lbl">BUY hit rate (1M)</div>
-        </div>
-        <div class="score-stat">
-          <div class="s-val ${avgRet !== '—' && parseFloat(avgRet) >= 0 ? 'pos' : avgRet !== '—' ? 'neg' : ''}">${avgRet}</div>
-          <div class="s-lbl">Avg BUY return (1M)</div>
-        </div>
-        <div class="score-stat">
-          <div class="s-val">${total}</div>
-          <div class="s-lbl">Signals scored</div>
-        </div>
-      </div>
-      ${last20.length === 0 ? `<div style="color:var(--muted);font-size:12px;padding:8px 0">No scored signals yet — check back tomorrow.</div>` : `
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Ticker</th><th>Action</th><th>1M Return</th><th>Outcome</th></tr></thead>
-          <tbody>
-            ${last20.map(r => {
-              const ret = r['+1M_RETURN_PCT'];
-              const out = r['+1M_OUTCOME'] || '';
-              const retFmt = ret ? (parseFloat(ret) >= 0 ? '+' : '') + parseFloat(ret).toFixed(2) + '%' : '—';
-              const retClass = ret ? (parseFloat(ret) >= 0 ? 'pos' : 'neg') : '';
-              const dateShort = (r.SIGNAL_DATE || '').slice(0, 10);
-              return `<tr>
-                <td style="color:var(--muted);font-size:12px">${dateShort}</td>
-                <td class="ticker">${r.TICKER || '—'}</td>
-                <td><span class="badge ${r.ACTION || ''}">${r.ACTION || '—'}</span></td>
-                <td class="num ${retClass}">${retFmt}</td>
-                <td>${out ? `<span class="badge ${outcomeClass(out)}">${out}</span>` : '—'}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>`}
-    </div>`;
-    })()}
-
-    <div class="gap"></div>
-
-    ${(() => {
       const top5 = (pipeline || []).slice(0, 5);
       if (top5.length === 0) return '';
       return `
@@ -682,7 +673,14 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
       <div class="pipeline-subtitle">Stocks heating up in Brian's chat before official portfolio entry</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Ticker</th><th>Score</th><th>Trend</th><th>Brian</th><th>7d</th><th>Last Seen</th></tr></thead>
+          <thead><tr>
+            <th onclick="sortTable(this)">Ticker</th>
+            <th onclick="sortTable(this)">Score</th>
+            <th onclick="sortTable(this)">Trend</th>
+            <th onclick="sortTable(this)">Brian</th>
+            <th onclick="sortTable(this)">7d</th>
+            <th onclick="sortTable(this)">Last Seen</th>
+          </tr></thead>
           <tbody>
             ${top5.map(r => `
             <tr onclick="window.open('https://finance.yahoo.com/quote/${encodeURIComponent(r.TICKER)}','_blank')" style="cursor:pointer">
@@ -698,6 +696,81 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
       </div>
     </div>`;
     })()}
+
+    <div class="gap"></div>
+
+    <div class="section">
+      <div class="section-title">Rebalancing · ${actionable.length} actions</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortTable(this)">Ticker</th>
+              <th onclick="sortTable(this)">Action</th>
+              <th onclick="sortTable(this)">Target</th>
+              <th onclick="sortTable(this)">Current</th>
+              <th onclick="sortTable(this)">Delta</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${actionable.map(r => {
+              const isCash  = r.TICKER === 'CASH/MMF';
+              const yhUrl   = isCash ? '' : `https://finance.yahoo.com/quote/${encodeURIComponent(r.TICKER)}`;
+              const ibkrUrl = isCash ? '' : `https://client.ibkr.com/portal/#/trade?symbol=${encodeURIComponent(r.TICKER)}`;
+              return `
+              <tr>
+                <td class="ticker" ${isCash ? '' : `onclick="window.open('${yhUrl}','_blank')"`} style="${isCash ? '' : 'cursor:pointer'}">
+                  ${r.TICKER}
+                  ${isCash ? '' : `<span style="font-size:9px;color:var(--muted);margin-left:4px">↗</span>`}
+                </td>
+                <td><span class="badge ${r.ACTION}">${r.ACTION}</span></td>
+                <td class="num">${eur(r.TARGET_EUR)}</td>
+                <td class="num">${eur(r.CURRENT_EUR)}</td>
+                <td class="num ${sign(r.DELTA_EUR)}" ${isCash ? '' : `onclick="window.open('${ibkrUrl}','_blank')"`} style="${isCash ? '' : 'cursor:pointer;text-decoration:underline;text-decoration-color:rgba(148,163,184,0.4)'}">
+                  ${eur(r.DELTA_EUR)}
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="tap-hint">Tap ticker → Yahoo Finance &nbsp;·&nbsp; Tap delta → Trade on IBKR</div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="section">
+      <div class="section-title">My Positions · ${positions.length} stocks</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortTable(this)">Ticker</th>
+              <th onclick="sortTable(this)">Value (€)</th>
+              <th onclick="sortTable(this)">P&amp;L (€)</th>
+              <th onclick="sortTable(this)">P&amp;L %</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${[...positions]
+              .sort((a, b) => parseFloat(b['PNL PCT'] || 0) - parseFloat(a['PNL PCT'] || 0))
+              .map(p => {
+                const pnlPct = parseFloat(p['PNL PCT'] || 0);
+                const yhUrl  = `https://finance.yahoo.com/quote/${encodeURIComponent(p.TICKER)}`;
+                const pnlSign = pnlPct >= 0 ? 'pos' : 'neg';
+                const pnlPctFmt = isNaN(pnlPct) ? '—' : (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%';
+                return `
+                <tr onclick="window.open('${yhUrl}','_blank')" style="cursor:pointer">
+                  <td class="ticker">${p.TICKER} <span style="font-size:9px;color:var(--muted)">↗</span></td>
+                  <td class="num">${eur(p['MARKET VALUE EUR'])}</td>
+                  <td class="num ${sign(p['UNREALIZED P&L EUR'])}">${eur(p['UNREALIZED P&L EUR'])}</td>
+                  <td class="num ${pnlSign}" style="font-weight:700">${pnlPctFmt}</td>
+                </tr>`;
+              }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
 
     <div class="gap"></div>
 
@@ -717,7 +790,15 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Ticker</th><th>Current</th><th>Stop</th><th>Distance</th><th>Max Risk</th><th>Type</th><th>Status</th></tr></thead>
+          <thead><tr>
+            <th onclick="sortTable(this)">Ticker</th>
+            <th onclick="sortTable(this)">Current</th>
+            <th onclick="sortTable(this)">Stop</th>
+            <th onclick="sortTable(this)">Distance</th>
+            <th onclick="sortTable(this)">Max Risk</th>
+            <th onclick="sortTable(this)">Type</th>
+            <th onclick="sortTable(this)">Status</th>
+          </tr></thead>
           <tbody>
             ${sl.map(r => {
               const tier = r.TIER || '';
@@ -762,78 +843,62 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
 
     <div class="gap"></div>
 
+    ${(() => {
+      const ssMap = Object.fromEntries((scoreSummary || []).map(r => [r.METRIC, r]));
+      const buyHit  = ssMap['BUY hit rate (1M)']?.VALUE  || '—';
+      const avgRet  = ssMap['Avg return per BUY signal (1M)']?.VALUE || '—';
+      const total   = ssMap['Total signals scored']?.VALUE || '0';
+      const last20  = (scoreRows || []).slice(-20).reverse();
+
+      const outcomeClass = o => ['CORRECT','INCORRECT','NEUTRAL'].includes(o) ? o : '';
+
+      return `
     <div class="section">
-      <div class="section-title">Rebalancing · ${actionable.length} actions</div>
+      <div class="section-title">Signal Scorecard · ${total} signals scored</div>
+      <div class="score-stats">
+        <div class="score-stat">
+          <div class="s-val ${buyHit !== '—' && parseFloat(buyHit) >= 50 ? 'pos' : buyHit !== '—' ? 'neg' : ''}">${buyHit}</div>
+          <div class="s-lbl">BUY hit rate (1M)</div>
+        </div>
+        <div class="score-stat">
+          <div class="s-val ${avgRet !== '—' && parseFloat(avgRet) >= 0 ? 'pos' : avgRet !== '—' ? 'neg' : ''}">${avgRet}</div>
+          <div class="s-lbl">Avg BUY return (1M)</div>
+        </div>
+        <div class="score-stat">
+          <div class="s-val">${total}</div>
+          <div class="s-lbl">Signals scored</div>
+        </div>
+      </div>
+      ${last20.length === 0 ? `<div style="color:var(--muted);font-size:12px;padding:8px 0">No scored signals yet — check back tomorrow.</div>` : `
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr>
-              <th>Ticker</th>
-              <th>Action</th>
-              <th>Target</th>
-              <th>Current</th>
-              <th>Delta</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            <th onclick="sortTable(this)">Date</th>
+            <th onclick="sortTable(this)">Ticker</th>
+            <th onclick="sortTable(this)">Action</th>
+            <th onclick="sortTable(this)">1M Return</th>
+            <th onclick="sortTable(this)">Outcome</th>
+          </tr></thead>
           <tbody>
-            ${actionable.map(r => {
-              const isCash  = r.TICKER === 'CASH/MMF';
-              const yhUrl   = isCash ? '' : `https://finance.yahoo.com/quote/${encodeURIComponent(r.TICKER)}`;
-              const ibkrUrl = isCash ? '' : `https://client.ibkr.com/portal/#/trade?symbol=${encodeURIComponent(r.TICKER)}`;
-              return `
-              <tr>
-                <td class="ticker" ${isCash ? '' : `onclick="window.open('${yhUrl}','_blank')"`} style="${isCash ? '' : 'cursor:pointer'}">
-                  ${r.TICKER}
-                  ${isCash ? '' : `<span style="font-size:9px;color:var(--muted);margin-left:4px">↗</span>`}
-                </td>
-                <td><span class="badge ${r.ACTION}">${r.ACTION}</span></td>
-                <td class="num">${eur(r.TARGET_EUR)}</td>
-                <td class="num">${eur(r.CURRENT_EUR)}</td>
-                <td class="num ${sign(r.DELTA_EUR)}" ${isCash ? '' : `onclick="window.open('${ibkrUrl}','_blank')"`} style="${isCash ? '' : 'cursor:pointer;text-decoration:underline;text-decoration-color:rgba(148,163,184,0.4)'}">
-                  ${eur(r.DELTA_EUR)}
-                </td>
+            ${last20.map(r => {
+              const ret = r['+1M_RETURN_PCT'];
+              const out = r['+1M_OUTCOME'] || '';
+              const retFmt = ret ? (parseFloat(ret) >= 0 ? '+' : '') + parseFloat(ret).toFixed(2) + '%' : '—';
+              const retClass = ret ? (parseFloat(ret) >= 0 ? 'pos' : 'neg') : '';
+              const dateShort = (r.SIGNAL_DATE || '').slice(0, 10);
+              return `<tr>
+                <td style="color:var(--muted);font-size:12px">${dateShort}</td>
+                <td class="ticker">${r.TICKER || '—'}</td>
+                <td><span class="badge ${r.ACTION || ''}">${r.ACTION || '—'}</span></td>
+                <td class="num ${retClass}">${retFmt}</td>
+                <td>${out ? `<span class="badge ${outcomeClass(out)}">${out}</span>` : '—'}</td>
               </tr>`;
             }).join('')}
           </tbody>
         </table>
-      </div>
-      <div class="tap-hint">Tap ticker → Yahoo Finance &nbsp;·&nbsp; Tap delta → Trade on IBKR</div>
-    </div>
-
-    <div class="gap"></div>
-
-    <div class="section">
-      <div class="section-title">My Positions · ${positions.length} stocks</div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Ticker</th>
-              <th>Value (€)</th>
-              <th>P&amp;L (€)</th>
-              <th>P&amp;L %</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${[...positions]
-              .sort((a, b) => parseFloat(b['PNL PCT'] || 0) - parseFloat(a['PNL PCT'] || 0))
-              .map(p => {
-                const pnlPct = parseFloat(p['PNL PCT'] || 0);
-                const yhUrl  = `https://finance.yahoo.com/quote/${encodeURIComponent(p.TICKER)}`;
-                const pnlSign = pnlPct >= 0 ? 'pos' : 'neg';
-                const pnlPctFmt = isNaN(pnlPct) ? '—' : (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%';
-                return `
-                <tr onclick="window.open('${yhUrl}','_blank')" style="cursor:pointer">
-                  <td class="ticker">${p.TICKER} <span style="font-size:9px;color:var(--muted)">↗</span></td>
-                  <td class="num">${eur(p['MARKET VALUE EUR'])}</td>
-                  <td class="num ${sign(p['UNREALIZED P&L EUR'])}">${eur(p['UNREALIZED P&L EUR'])}</td>
-                  <td class="num ${pnlSign}" style="font-weight:700">${pnlPctFmt}</td>
-                </tr>`;
-              }).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      </div>`}
+    </div>`;
+    })()}
   `;
 
   window._log = log;
