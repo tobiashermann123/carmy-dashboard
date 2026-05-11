@@ -714,6 +714,65 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
     <div class="gap"></div>
 
     ${(() => {
+      const ssMap = Object.fromEntries((scoreSummary || []).map(r => [r.METRIC, r]));
+      const buyHit  = ssMap['BUY hit rate (1M)']?.VALUE  || '—';
+      const avgRet  = ssMap['Avg return per BUY signal (1M)']?.VALUE || '—';
+      const total   = ssMap['Total signals scored']?.VALUE || '0';
+      const last20  = (scoreRows || []).slice(-20).reverse();
+
+      const outcomeClass = o => ['CORRECT','INCORRECT','NEUTRAL'].includes(o) ? o : '';
+
+      return `
+    <div class="section">
+      <div class="section-title">Signal Scorecard · ${total} signals scored</div>
+      <div class="score-stats">
+        <div class="score-stat">
+          <div class="s-val ${buyHit !== '—' && parseFloat(buyHit) >= 50 ? 'pos' : buyHit !== '—' ? 'neg' : ''}">${buyHit}</div>
+          <div class="s-lbl">BUY hit rate (1M)</div>
+        </div>
+        <div class="score-stat">
+          <div class="s-val ${avgRet !== '—' && parseFloat(avgRet) >= 0 ? 'pos' : avgRet !== '—' ? 'neg' : ''}">${avgRet}</div>
+          <div class="s-lbl">Avg BUY return (1M)</div>
+        </div>
+        <div class="score-stat">
+          <div class="s-val">${total}</div>
+          <div class="s-lbl">Signals scored</div>
+        </div>
+      </div>
+      ${last20.length === 0 ? `<div style="color:var(--muted);font-size:12px;padding:8px 0">No scored signals yet — check back tomorrow.</div>` : `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th onclick="sortTable(this)">Date</th>
+            <th onclick="sortTable(this)">Ticker</th>
+            <th onclick="sortTable(this)">Action</th>
+            <th onclick="sortTable(this)">1M Return</th>
+            <th onclick="sortTable(this)">Outcome</th>
+          </tr></thead>
+          <tbody>
+            ${last20.map(r => {
+              const ret = r['+1M_RETURN_PCT'];
+              const out = r['+1M_OUTCOME'] || '';
+              const retFmt = ret ? (parseFloat(ret) >= 0 ? '+' : '') + parseFloat(ret).toFixed(2) + '%' : '—';
+              const retClass = ret ? (parseFloat(ret) >= 0 ? 'pos' : 'neg') : '';
+              const dateShort = (r.SIGNAL_DATE || '').slice(0, 10);
+              return `<tr>
+                <td style="color:var(--muted);font-size:12px">${dateShort}</td>
+                <td class="ticker">${r.TICKER || '—'}</td>
+                <td><span class="badge ${r.ACTION || ''}">${r.ACTION || '—'}</span></td>
+                <td class="num ${retClass}">${retFmt}</td>
+                <td>${out ? `<span class="badge ${outcomeClass(out)}">${out}</span>` : '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`}
+    </div>`;
+    })()}
+
+    <div class="gap"></div>
+
+    ${(() => {
       const top5 = (pipeline || []).slice(0, 5);
       if (top5.length === 0) return '';
       return `
@@ -890,64 +949,6 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
     </div>`;
     })()}
 
-    <div class="gap"></div>
-
-    ${(() => {
-      const ssMap = Object.fromEntries((scoreSummary || []).map(r => [r.METRIC, r]));
-      const buyHit  = ssMap['BUY hit rate (1M)']?.VALUE  || '—';
-      const avgRet  = ssMap['Avg return per BUY signal (1M)']?.VALUE || '—';
-      const total   = ssMap['Total signals scored']?.VALUE || '0';
-      const last20  = (scoreRows || []).slice(-20).reverse();
-
-      const outcomeClass = o => ['CORRECT','INCORRECT','NEUTRAL'].includes(o) ? o : '';
-
-      return `
-    <div class="section">
-      <div class="section-title">Signal Scorecard · ${total} signals scored</div>
-      <div class="score-stats">
-        <div class="score-stat">
-          <div class="s-val ${buyHit !== '—' && parseFloat(buyHit) >= 50 ? 'pos' : buyHit !== '—' ? 'neg' : ''}">${buyHit}</div>
-          <div class="s-lbl">BUY hit rate (1M)</div>
-        </div>
-        <div class="score-stat">
-          <div class="s-val ${avgRet !== '—' && parseFloat(avgRet) >= 0 ? 'pos' : avgRet !== '—' ? 'neg' : ''}">${avgRet}</div>
-          <div class="s-lbl">Avg BUY return (1M)</div>
-        </div>
-        <div class="score-stat">
-          <div class="s-val">${total}</div>
-          <div class="s-lbl">Signals scored</div>
-        </div>
-      </div>
-      ${last20.length === 0 ? `<div style="color:var(--muted);font-size:12px;padding:8px 0">No scored signals yet — check back tomorrow.</div>` : `
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th onclick="sortTable(this)">Date</th>
-            <th onclick="sortTable(this)">Ticker</th>
-            <th onclick="sortTable(this)">Action</th>
-            <th onclick="sortTable(this)">1M Return</th>
-            <th onclick="sortTable(this)">Outcome</th>
-          </tr></thead>
-          <tbody>
-            ${last20.map(r => {
-              const ret = r['+1M_RETURN_PCT'];
-              const out = r['+1M_OUTCOME'] || '';
-              const retFmt = ret ? (parseFloat(ret) >= 0 ? '+' : '') + parseFloat(ret).toFixed(2) + '%' : '—';
-              const retClass = ret ? (parseFloat(ret) >= 0 ? 'pos' : 'neg') : '';
-              const dateShort = (r.SIGNAL_DATE || '').slice(0, 10);
-              return `<tr>
-                <td style="color:var(--muted);font-size:12px">${dateShort}</td>
-                <td class="ticker">${r.TICKER || '—'}</td>
-                <td><span class="badge ${r.ACTION || ''}">${r.ACTION || '—'}</span></td>
-                <td class="num ${retClass}">${retFmt}</td>
-                <td>${out ? `<span class="badge ${outcomeClass(out)}">${out}</span>` : '—'}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>`}
-    </div>`;
-    })()}
   `;
 
   window._log = log;
