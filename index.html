@@ -709,11 +709,9 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
     ${(() => {
       const breaches = (stopLosses || []).filter(r => r.TIER === 'BREACH');
       const criticals = (stopLosses || []).filter(r => r.TIER === 'CRITICAL');
-      const earnCritical = (earningsData || []).filter(r => r.TIER === 'CRITICAL' && r.IN_YOUR_PORTFOLIO === 'YES');
       const allChips = [
         ...breaches.map(r => ({label: `${r.TICKER} stop breached (${parseFloat(r.DISTANCE_PCT||0).toFixed(1)}%)`, cls: 'breach'})),
         ...criticals.map(r => ({label: `${r.TICKER} stop ${parseFloat(r.DISTANCE_PCT||0).toFixed(1)}% away`, cls: 'critical'})),
-        ...earnCritical.map(r => ({label: `${r.TICKER} earnings in ${r.DAYS_AWAY}d`, cls: 'critical'})),
       ];
       return allChips.length === 0 ? '' : `
 <div class="risk-bar">${allChips.map(c => `<div class="risk-chip ${c.cls}">${c.label}</div>`).join('')}</div>`;
