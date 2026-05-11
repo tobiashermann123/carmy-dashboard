@@ -520,7 +520,7 @@ function sortTable(thEl) {
     rows.forEach((r, i) => { if (i >= maxRows) r.classList.add('collapsed-row'); });
     if (showMoreRow) {
       const hidden = rows.filter(r => r.classList.contains('collapsed-row')).length;
-      showMoreRow.querySelector('td').textContent = `Show ${hidden} more ▾`;
+      showMoreRow.querySelector('td').textContent = hidden > 0 ? `Show ${hidden} more ▾` : 'Show less ▲';
     }
   }
 }
@@ -544,9 +544,17 @@ function initCollapsibleTables(maxRows = 10, container = document) {
     smRow.className = 'show-more-row';
     smRow.innerHTML = `<td colspan="${colCount}">Show ${extra} more ▾</td>`;
     smRow.onclick = () => {
-      table.dataset.collapsed = 'false';
-      tbody.querySelectorAll('tr.collapsed-row').forEach(r => r.classList.remove('collapsed-row'));
-      smRow.remove();
+      if (table.dataset.collapsed === 'true') {
+        table.dataset.collapsed = 'false';
+        tbody.querySelectorAll('tr.collapsed-row').forEach(r => r.classList.remove('collapsed-row'));
+        smRow.querySelector('td').textContent = 'Show less ▲';
+      } else {
+        table.dataset.collapsed = 'true';
+        const allRows = Array.from(tbody.querySelectorAll('tr:not(.show-more-row)'));
+        allRows.forEach((r, i) => { if (i >= maxRows) r.classList.add('collapsed-row'); });
+        smRow.querySelector('td').textContent = `Show ${extra} more ▾`;
+        smRow.closest('.table-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     };
     tbody.appendChild(smRow);
   });
