@@ -393,7 +393,7 @@ function aggregateLog(log, range) {
     const inWindow = log.filter(r => {
       if (!r.DATE || r.DATE.length <= 10) return false;
       const h = parseDate(r.DATE).getHours();
-      return h >= 13 && h <= 20;
+      return h >= 12 && h <= 21;
     });
     if (!inWindow.length) return [];
     // Use most recent day that has market-hours data
