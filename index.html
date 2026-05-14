@@ -452,26 +452,38 @@ function buildChartData(log, mode) {
   const agg    = aggregateLog(log, chartRange);
   const labels = agg.map(r => r._label);
   const pr     = agg.length < 60 ? 3 : 0;
+
+  const normalize = arr => {
+    const base = arr.length > 0 ? arr[0] : 0;
+    return arr.map(v => v - base);
+  };
+
   if (mode === 'pnl') {
+    const data = normalize(agg.map(r => parseFloat(r.UNREALIZED_PNL_EUR) || 0));
     return {
       labels,
+      _maxAbs: Math.max(...data.map(Math.abs), 0.01),
       datasets: [{
-        data: agg.map(r => parseFloat(r.UNREALIZED_PNL_EUR) || 0),
+        data,
         borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)',
         fill: true, tension: 0.3, pointRadius: pr, pointBackgroundColor: '#22c55e',
       }],
     };
   } else {
+    const invData  = normalize(agg.map(r => parseFloat(r.INVESTED_EUR) || 0));
+    const cashData = normalize(agg.map(r => parseFloat(r.CASH_EUR) || 0));
+    const maxAbs   = Math.max(...[...invData, ...cashData].map(Math.abs), 0.01);
     return {
       labels,
+      _maxAbs: maxAbs,
       datasets: [{
         label: 'Invested',
-        data: agg.map(r => parseFloat(r.INVESTED_EUR) || 0),
+        data: invData,
         borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)',
         fill: true, tension: 0.3, pointRadius: pr, pointBackgroundColor: '#38bdf8',
       }, {
         label: 'Cash',
-        data: agg.map(r => parseFloat(r.CASH_EUR) || 0),
+        data: cashData,
         borderColor: '#94a3b8', backgroundColor: 'rgba(148,163,184,0.06)',
         fill: true, tension: 0.3, pointRadius: pr, pointBackgroundColor: '#94a3b8',
       }],
@@ -479,7 +491,7 @@ function buildChartData(log, mode) {
   }
 }
 
-const chartOptions = (showLegend) => ({
+const chartOptions = (showLegend, maxAbs = 1) => ({
   responsive: true,
   maintainAspectRatio: true,
   plugins: {
@@ -489,7 +501,12 @@ const chartOptions = (showLegend) => ({
   },
   scales: {
     x: { grid: { color: 'rgba(51,65,85,0.5)' }, ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 6 } },
-    y: { grid: { color: 'rgba(51,65,85,0.5)' }, ticks: { color: '#64748b', font: { size: 10 }, callback: v => '€' + v.toFixed(0) } },
+    y: {
+      min: -(maxAbs * 1.3),
+      max:  (maxAbs * 1.3),
+      grid: { color: 'rgba(51,65,85,0.5)' },
+      ticks: { color: '#64748b', font: { size: 10 }, callback: v => (v > 0 ? '+' : '') + '€' + v.toFixed(0) },
+    },
   },
 });
 
@@ -511,10 +528,11 @@ function switchRange(log, range) {
 
 function rebuildChart() {
   if (activeChart) activeChart.destroy();
+  const chartData = buildChartData(window._log, chartMode);
   activeChart = new Chart(document.getElementById('mainChart'), {
     type: 'line',
-    data: buildChartData(window._log, chartMode),
-    options: chartOptions(chartMode === 'invested'),
+    data: chartData,
+    options: chartOptions(chartMode === 'invested', chartData._maxAbs),
   });
 }
 
