@@ -48,6 +48,12 @@
       color: var(--text); border-radius: 8px; padding: 6px 12px;
       font-size: 12px; cursor: pointer; margin-top: 4px; flex-shrink: 0;
     }
+    .market-dot {
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 50%; vertical-align: middle; margin-left: 5px;
+    }
+    .market-dot.open   { background: var(--buy); box-shadow: 0 0 5px var(--buy); }
+    .market-dot.closed { background: var(--sell); }
     .refresh-btn:active { opacity: 0.7; }
 
     /* ── Brian banners ── */
@@ -370,18 +376,48 @@ function computeTWR(log) {
   return (twr - 1) * 100;
 }
 
+// US market: Mon–Fri 13:30–20:00 UTC
+function getMarketStatus() {
+  const now = new Date();
+  const day  = now.getUTCDay();
+  const mins = now.getUTCHours() * 60 + now.getUTCMinutes();
+  if (day === 0 || day === 6) return 'closed';
+  return (mins >= 13 * 60 + 30 && mins < 20 * 60) ? 'open' : 'closed';
+}
+
 function aggregateLog(log, range) {
-  const now    = new Date();
+  const now = new Date();
+
+  if (range === '1D') {
+    // Only rows with full timestamps, within the 13:00–21:00 local hour window
+    const inWindow = log.filter(r => {
+      if (!r.DATE || r.DATE.length <= 10) return false;
+      const h = parseDate(r.DATE).getHours();
+      return h >= 13 && h <= 20;
+    });
+    if (!inWindow.length) return [];
+    // Use most recent day that has market-hours data
+    const latestDay = inWindow[inWindow.length - 1].DATE.slice(0, 10);
+    const dayRows   = inWindow.filter(r => r.DATE.startsWith(latestDay));
+    const buckets   = {};
+    for (const row of dayRows) {
+      const dt  = parseDate(row.DATE);
+      const key = getBucket(dt, '1D');
+      buckets[key] = { row, dt };
+    }
+    return Object.entries(buckets)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, { row, dt }]) => ({ ...row, _label: formatLabel(dt, range) }));
+  }
+
   const cutoff = new Date(now);
-  if      (range === '1D') cutoff.setDate(now.getDate() - 1);
-  else if (range === '1W') cutoff.setDate(now.getDate() - 7);
+  if      (range === '1W') cutoff.setDate(now.getDate() - 7);
   else if (range === '1M') cutoff.setMonth(now.getMonth() - 1);
   else if (range === '1Y') cutoff.setFullYear(now.getFullYear() - 1);
   else cutoff.setFullYear(2000);
 
   const filtered = log.filter(r => {
     if (!r.DATE) return false;
-    if (range === '1D' && r.DATE.length <= 10) return false; // skip legacy date-only rows
     return parseDate(r.DATE) >= cutoff;
   });
   if (!filtered.length) return [];
@@ -653,7 +689,7 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
     <div class="header">
       <div class="header-left">
         <h1>Carmen Cooks</h1>
-        <div class="subtitle">Updated ${updated}</div>
+        <div class="subtitle">Updated ${updated} <span class="market-dot ${getMarketStatus()}"></span> Market ${getMarketStatus()}</div>
       </div>
       <button class="refresh-btn" onclick="init()">Refresh</button>
     </div>
