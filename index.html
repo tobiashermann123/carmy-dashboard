@@ -66,6 +66,12 @@
       border-radius: 8px;
       font-size: 13px;
       font-weight: 600;
+      transition: background 0.3s, color 0.3s, border-left-color 0.3s;
+    }
+    .brian-alert.seen {
+      background: var(--surface);
+      color: var(--muted);
+      border-left-color: var(--border);
     }
     .brian-info {
       margin: 0 16px 4px;
@@ -701,7 +707,7 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
   const brianIsRecent = brianHoursAgo !== null && brianHoursAgo < 24;
   const changesBtn = `<button class="brian-changes-btn" onclick="openChanges()">See changes →</button>`;
   const brianBanner = brianIsRecent
-    ? `<div class="brian-alert">⚡ Brian updated his portfolio ${brianHoursAgo < 1 ? 'less than an hour' : brianHoursAgo + 'h'} ago ${changesBtn}</div>`
+    ? `<div class="brian-alert" id="brianBanner">⚡ Brian updated his portfolio ${brianHoursAgo < 1 ? 'less than an hour' : brianHoursAgo + 'h'} ago ${changesBtn}</div>`
     : `<div class="brian-info"><span>Brian's portfolio: ${brianUpdatedStr}</span>${changesBtn}</div>`;
 
   const actionable = report
@@ -715,7 +721,7 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
   app.innerHTML = `
     <div class="header">
       <div class="header-left">
-        <h1>Carmen Cooks</h1>
+        <h1 onclick="window.location.reload()" style="cursor:pointer">Carmen Cooks</h1>
         <div class="subtitle">Updated ${updated} <span class="market-dot ${getMarketStatus()}"></span> Market ${getMarketStatus()}</div>
       </div>
       <button class="refresh-btn" onclick="init()">Refresh</button>
@@ -1029,6 +1035,7 @@ function render(summary, report, log, positions, brianPortfolio, scoreSummary, s
 
 // ── Brian changes bottom sheet ────────────────────────────────────────────────
 function openChanges() {
+  document.getElementById('brianBanner')?.classList.add('seen');
   const changes = window._brianChanges || [];
   const snapshot = window._brianSnapshot || '';
   const meaningful = changes
